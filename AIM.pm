@@ -1,7 +1,7 @@
 package Net::AIM;
 
 #
-# $Revision: 1.20 $
+# $Revision: 1.21 $
 # $Author: aryeh $
 # $Date: 2001/10/26 03:48:12 $
 #
@@ -40,7 +40,7 @@ use Carp;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '1.01';
+$VERSION = '1.21';
 
 =pod
 
