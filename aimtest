@@ -1,0 +1,249 @@
+#!/usr/bin/perl -w
+
+# This script is a simple script that creates an aimbot
+# shamelessly adapted from Net::IRC
+
+use strict;
+use Net::AIM;
+
+#
+#  Create the AIM and Connection objects
+#
+
+$|=1;
+my $aim = new Net::AIM;
+
+# Do we want debuggin information?
+#$aim->debug(1);
+
+if (@ARGV != 2) {
+	print "Usage: $0 <screenname> <password>\n";
+	exit;
+}
+
+print "Creating connection to AIM server...\n";
+
+my $conn = $aim->newconn(
+		Screenname => $ARGV[0],
+		Password => $ARGV[1]
+	)
+    or die "aimtest: Can't connect to AIM server.\n";
+
+#
+#  Here's some stuff to print at odd moments.
+#
+
+my @zippy = (
+  "I am a traffic light, and Alan Ginsberg kidnapped my laundry in 1927!",
+  "I'm a GENIUS!  I want to dispute sentence structure with SUSAN SONTAG!!",
+  "Now I'm telling MISS PIGGY about MONEY MARKET FUNDS!",
+  "I have a VISION!  It's a RANCID double-FISHWICH on an ENRICHED BUN!!",
+  "My pants just went on a wild rampage through a Long Island Bowling Alley!!",
+  "I always liked FLAG DAY!!",
+  "I will establish the first SHOPPING MALL in NUTLEY, New Jersey...",
+  "I used to be STUPID, too..before I started watching UHF-TV!!",
+  "I smell like a wet reducing clinic on Columbus Day!",
+  "Just walk along and try NOT to think about your INTESTINES being almost FORTY YARDS LONG!!",
+  "It's the RINSE CYCLE!!  They've ALL IGNORED the RINSE CYCLE!!",
+  "Yow!  It's some people inside the wall!  This is better than mopping!",
+  "Is the EIGHTIES when they had ART DECO and GERALD McBOING-BOING lunch boxes??",
+  "This PIZZA symbolizes my COMPLETE EMOTIONAL RECOVERY!!",
+  "I call it a \"SARDINE ON WHEAT\"!",
+  "Is it FUN to be a MIDGET?",
+  "Someone in DAYTON, Ohio is selling USED CARPETS to a SERBO-CROATIAN!!",
+	     );
+
+#
+#  Here are the handler subroutines. Fascinating, huh?
+#
+
+
+# What to do on disconnection
+sub on_disconnect {
+	my ($self, $event) = @_;
+
+	print "Disconnected from (",
+	      ($event->args())[0], ").\n";
+
+# 	Right now don't reconnect, because 2 bots can fight for the 
+#		login and just get banned...
+#	$self->connect();
+
+}
+
+sub pickrandom {   # Choose a random quote from the @zippy array.
+    return $zippy[ rand scalar @zippy ];
+}
+
+
+# What to do when we receive an IM 
+sub on_im {
+    my ($self, $event) = @_;
+    my ($nick) = $event->from;
+
+    print "*$nick*  ", ($event->args), "\n";
+    $self->send_im($nick, &pickrandom()) unless ($self->normalize($nick) eq $self->normalize($self->screenname));  # Say a Zippy quote.
+}
+
+# What to do when the bot gets the NICK command 
+#   (This usually happens upon login....)
+sub on_nick {
+	my ($self, $event) = @_;
+	my ($nick) = $event->from;
+
+	print "*$nick*  ", ($event->args), "\n";
+	$self->set_info('I am running Net::AIM perl module written by Aryeh Goldsmith');
+
+	$self->set_idle(0);
+
+	# You will only get buddy updates from those you add...
+
+	$self->add_buddy("Buddies", "Perl AIM");
+#	$self->send_im('Perl AIM', 'testing...');
+}
+
+my %users_online;
+
+sub on_update_buddy {
+	my ($self, $event) = @_;
+#	my ($nick) = $event->from;
+
+	my ($bud, $online, $evil, $signon_time, $idle_amount, $user_class) = $event->args;
+
+	#lets print out when users leave and when they enter;
+	if ($online eq 'T' && ! exists $users_online{$bud}) {
+		$users_online{$bud} = $signon_time;
+		print "$bud has signed on at " . scalar localtime($signon_time) . "\n";
+	} elsif ($online eq 'F') {
+		delete $users_online{$bud};
+		print "$bud has signed off at " . scalar localtime($signon_time)  . "\n";
+	}
+}
+
+sub on_config {
+	my ($self, $event) = @_;
+	
+	my ($str) = $event->args;
+	$self->set_config($str);
+
+# Uncomment the next line to sent the config back to the server
+# Maybe you should modify it first?
+#	$self->send_config();
+
+#	914351 5174
+	$self->add_config_buddies;
+
+	
+}
+
+sub on_error {
+	my ($self, $event) = @_;
+
+	my $error;
+	my @stuff;
+	($error, @stuff) = $event->args;
+		
+	my $errstr = $event->trans($error);
+
+	$errstr =~ s/\$(\d+)/$stuff[$1]/ge;
+
+	print STDERR "ERROR: $errstr\n";
+
+}
+
+
+sub on_chat_left {
+	my ($self, $event) = @_;
+	
+	my ($id) = $event->args;
+	my $name = $self->get_roomname($id);
+	
+	$self->chat_left($id);
+
+	print "We left room $name\n";
+}
+
+
+sub on_chat_join {
+	my ($self, $event) = @_;
+	
+	my ($id, $name) = $event->args;
+	
+	$self->chat_joined($id, $name);
+
+	print "We joined room $name\n";
+}
+
+
+sub on_chat_update_buddy {
+	my $self = shift;
+#	my $self, $event) = @_;
+#	my ($id, $inside, @users) = $event->args;
+
+	print "UPDATECHAT\n";
+
+}
+
+sub on_chat_in {
+	my ($self, $event) = @_;
+	
+	my ($id, $user, $whisper, $msg) = $event->args;
+
+	my $action = 'said';
+	$action = 'whispered' if ($whisper =~ /T/i);
+
+	print '', $self->get_roomname($id) . "> $user $action $msg\n";
+	
+	if ($msg =~ /please leave/i) {
+		$self->chat_leave($id);
+	}
+
+}
+
+
+sub on_chat_invite {
+	my ($self, $event) = @_;
+	
+	my ($name, $id, $user, $msg) = $event->args;
+
+	print "Invited to room $name by $user\n";
+
+	$self->chat_join($id, $name);
+}
+
+sub on_eviled {
+	my ($self, $event) = @_;
+	
+	my ($level, $culprit) = $event->args;
+
+	$culprit = 'An anonymous user' if ($culprit =~ /^\s*$/);
+	print "$culprit slapped us! Our evil level is now $level\n";
+
+	#should we hit them back twice??
+	if ($culprit !~ /^\s*$/) {
+		$self->evil($culprit);
+		$self->evil($culprit);
+	}
+	
+}
+
+
+print "Installing handler routines...";
+
+$conn->add_handler('error',    \&on_error);
+$conn->add_handler('im_in',    \&on_im);
+$conn->add_handler('nick',    \&on_nick);
+$conn->add_handler('eviled',    \&on_eviled);
+$conn->add_handler('config',    \&on_config);
+$conn->add_handler('chat_join',    \&on_chat_join);
+$conn->add_handler('chat_left',    \&on_chat_left);
+$conn->add_handler('chat_in',    \&on_chat_in);
+$conn->add_handler('chat_invite',    \&on_chat_invite);
+$conn->add_handler('chat_update_buddy',    \&on_chat_update_buddy);
+$conn->add_handler('update_buddy',    \&on_update_buddy);
+$conn->add_global_handler('disconnect', \&on_disconnect);
+
+print " done.\n";
+
+print "starting...\n";
+$aim->start;
