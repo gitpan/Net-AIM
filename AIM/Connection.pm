@@ -1,9 +1,9 @@
 package Net::AIM::Connection;
 
 #
-# $Revision: 1.18 $
+# $Revision: 1.20 $
 # $Author: aryeh $
-# $Date: 2001/10/26 03:48:12 $
+# $Date: 2002/04/23 13:55:28 $
 #
 
 =head1 NAME
@@ -108,7 +108,7 @@ EOSub
 
       Net::AIM::Connection-E<gt>new( {
 	 Screenname => 'perlaim',
-	 Password => 'ilyegk',
+	 Password => 'yaddayadda',
 	 TocServer => 'toc.oscar.aol.com',
 	 TocPort => 80,
 	 AuthServer => 'login.oscar.aol.com',
@@ -672,17 +672,17 @@ sub log_in {
 
    $self->{"_outseq"} = ++$seq;
 
-   $self->send_to_AOL('toc_signon "' . $self->authserver . '" "' .
-	 $self->authport . '" "' . $screenname . '" "' .
-	 $self->encodePass($self->password) . 
-	 '" "english" ' . $self->encode($self->agent));
-
+   $self->send_to_AOL('toc_signon ' . $self->authserver . ' ' .
+         $self->authport . ' ' . $screenname . ' ' . 
+         $self->encodePass($self->password) .
+         ' english ' . $self->encode($self->agent));           
 
    # For PAUSE
    $self->set_handler('pause', sub { sleep(1); });
-   $self->set_handler('pause', sub { 
+   $self->set_handler('disconnect', sub { 
           my $self = shift;
-	  $self->reconnect();
+	  my $conn = $self->getconn();
+	  $conn->reconnect();
        }) if ($self->auto_reconnect);
    $self->set_handler('sign_on', sub {
       my $self = shift;

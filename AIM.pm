@@ -1,9 +1,9 @@
 package Net::AIM;
 
 #
-# $Revision: 1.21 $
+# $Revision: 1.22 $
 # $Author: aryeh $
-# $Date: 2001/10/26 03:48:12 $
+# $Date: 2002/04/23 14:09:15 $
 #
 #
 #
@@ -20,7 +20,7 @@ Net::AIM - Perl extension for AOL Instant Messenger TOC protocol
 
   $aim = new Net::AIM;
   $conn = $aim->newconn(Screenname   => 'Perl AIM',
-                        Password     => 'ilyegk');
+                        Password     => 'yaddayadda');
   $aim->start;
 
 =head1 DESCRIPTION
@@ -40,7 +40,7 @@ use Carp;
 use strict;
 use vars qw($VERSION);
 
-$VERSION = '1.21';
+$VERSION = '1.22';
 
 =pod
 
@@ -195,12 +195,14 @@ sub do_one_loop {
 
    # Block until input arrives, then hand the filehandle over to the
    # user-supplied coderef. Look! It's a freezer full of government cheese!
-   if ($nexttimer) {
-      $timeout = $nexttimer - $time < $self->{_timeout}
-	 ? $nexttimer - $time : $self->{_timeout};
-   } else {
-      $timeout = $self->{_timeout};
-   }
+   #
+   # doesn't look like the stuff below is needed... on its way out...
+#   if ($nexttimer) {
+#      $timeout = $nexttimer - $time < $self->{_timeout}
+#	 ? $nexttimer - $time : $self->{_timeout};
+#   } else {
+#      $timeout = $self->{_timeout};
+#   }
 
    # TODO get return value so we can drop out on disconnect
    # Or maybe just use the even queue and make a connect evt
@@ -208,7 +210,7 @@ sub do_one_loop {
    my $rv = 1;
    my $sel = $self->{_conn}->select;
 
-   foreach $ev ($sel->can_read($nexttimer)) {
+   foreach $ev ($sel->can_read($self->{_timeout})) {
       $self->{_conn}->read_and_parse();
    }
 
@@ -715,6 +717,13 @@ sub set_config_str {
       }
    }
 
+}
+
+# this is here for backwards compatibility
+sub set_config {
+   my $self = shift;
+   my $str = shift;
+   return $self->set_config_str($str, 1);
 }
 
 =pod

@@ -1,9 +1,9 @@
 #!/usr/bin/perl -w
 
 #
-# $Revision: 1.21 $
+# $Revision: 1.22 $
 # $Author: aryeh $
-# $Date: 2001/10/26 03:48:12 $
+# $Date: 2001/10/31 17:19:25 $
 #
 
 use strict;
@@ -40,7 +40,6 @@ my @zippy = ('Someday, when I\'m awfully low, And the world is cold, I will feel
  'Because it jiggles!',
  'All your base are belong to us!',
  'Cheeses loves ya!    - The Messy Gourmet', 
- 'When all you have is a hammer, suddenly everything looks like a nail...', 
 
  'KILLROY KILLROY'
  );
@@ -63,7 +62,7 @@ sub pickrandom { return $zippy[ rand scalar @zippy ]; }
 sub on_im {
    my ($self, $evt, $from, $to) = @_;
    my $args = $evt->args();
-   my ($nick, $friend, $msg) = @$args;
+   my ($nick, $auto_msg, $msg) = @$args;
 
    $stats{msgs_received}++;
 
