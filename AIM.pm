@@ -1,14 +1,15 @@
 package Net::AIM;
 
 #
-# $Revision: 1.15 $
+# $Revision: 1.20 $
 # $Author: aryeh $
-# $Date: 2001/01/24 22:25:30 $
+# $Date: 2001/10/26 03:48:12 $
 #
 #
 #
 
 =pod
+
 =head1 NAME
 
 Net::AIM - Perl extension for AOL Instant Messenger TOC protocol
@@ -97,7 +98,7 @@ sub debug {
 
 =item $aim->set($key, $val)
 
-This method is simply sets $key to $val in an internal hash for variables
+This method simply sets $key to $val in an internal hash for variables
 
 =cut
 sub set {
@@ -112,7 +113,7 @@ sub set {
 
 =item $aim->get($key)
 
-This method is simply gets the value of $key from the  internal hash
+This method simply gets the value of $key from the  internal hash
 
 =cut
 sub get {
@@ -167,6 +168,7 @@ sub do_one_loop {
    my $self = shift;
     
    my ($ev, $sock, $time, $nexttimer, $timeout);
+   print STDERR "Entered do_one_loop\n" if ($self->{_debug});
 
    # This cycles through our event queue and exects things that 
    # have an expired time.  It also sets $nexttimer to the closest
@@ -246,6 +248,17 @@ sub timeout {
 
 #################### BEGIN  ######################
 
+sub is_buddy {
+   my $self = shift;
+   my $group = shift;
+   my $buddy = shift;
+
+   return 1 if ($self->{_config}->{$group}->{$self->normalize($buddy)} eq 'b');
+   return 0;
+
+}
+
+
 =pod
 
 =item $aim->add_buddy($send_bool, $group, @buddies);
@@ -293,7 +306,7 @@ sub add_permit {
       $self->{_config}->{$group}->{$self->normalize($bud)} = 'p';
    }
 
-   return if ($send);
+   return unless ($send);
    return $self->{_conn}->add_permit(@buddies);
 }
 
@@ -319,7 +332,7 @@ sub add_deny {
       $self->{_config}->{$group}->{$self->normalize($bud)} = 'd';
    }
 
-   return if ($send);
+   return unless ($send);
    return $self->{_conn}->add_deny(@buddies);
 }
 
@@ -348,8 +361,8 @@ sub remove_buddy {
       delete $self->{_config}->{$group}->{$self->normalize($bud)};
    }
 
-   return if ($send);
-   return $self->{_conn}->add_remove(@buddies);
+   return unless ($send);
+   return $self->{_conn}->remove_buddy(@buddies);
 }
 
 # We should AUTOLOAD all of these ....

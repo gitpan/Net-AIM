@@ -1,5 +1,5 @@
 Net::AIM v1.01 README 
-$Date: 2001/01/24 22:25:30 $
+$Date: 2001/10/26 03:54:59 $
 
 
 Description:
@@ -40,6 +40,11 @@ irctest script.  Ahhh who am I kidding it is practically irctest after
       Usage: ./aimtest <screenname> <password>
 
 
+Note:
+      After banging my head against the wall for quite some time I figured
+out that the module doesn't work if you have 'AIM' (in uppercase) in
+the agent/version info that is sent to the server.  So don't put it in 
+there!!!
 
 
 Copyright info:

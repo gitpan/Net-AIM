@@ -1,9 +1,9 @@
 package Net::AIM::Event;
 
 #
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 # $Author: aryeh $
-# $Date: 2001/01/25 23:14:58 $
+# $Date: 2001/06/04 17:03:08 $
 #
 
 use strict;
@@ -13,6 +13,8 @@ my %_names;
 =head1 NAME
 
 Net::AIM::Event - Object to hold event data
+
+=head1 SYNOPSIS
 
 =head1 DESCRIPTION
 

@@ -1,12 +1,13 @@
 #!/usr/bin/perl -w
 
 #
-# $Revision: 1.18 $
+# $Revision: 1.21 $
 # $Author: aryeh $
-# $Date: 2001/01/26 17:56:57 $
+# $Date: 2001/10/26 03:48:12 $
 #
 
 use strict;
+use lib '.';
 use Net::AIM;
 
 $|=1;
@@ -16,14 +17,15 @@ if (@ARGV != 2) {
 	exit;
 }
 
-my $DEBUG = 1;
+my $DEBUG = 0;
 
 my $aim = new Net::AIM;
 $aim->debug(1) if ($DEBUG);
 
 print "Creating connection to AIM server...\n";
 $aim->newconn(  Screenname => $ARGV[0],
-	 Password => $ARGV[1]
+	 Password => $ARGV[1],
+	 AutoReconnect => 1
       ) or die "aimtest: Can't connect to AIM server.\n";
 
 my $conn = $aim->getconn();
@@ -31,12 +33,14 @@ my @zippy = ('Someday, when I\'m awfully low, And the world is cold, I will feel
  'Put your hand inside the puppet head',
  'The best thing about New York City is Naomi',
  "When you're following an angel\nDoes it mean you have to throw your body off a building?",
- 'Why am I up at 4:30? Because Naomi called me last night',
  'Let it be known that all women suffer from: GENDER SPECIFIC CONFUSION',
  'Commonsense is not that common!',
  'Build a little birdhouse in your soul',
  "He wants a shoehorn, the kind with teeth\nPeople should get beat up for stating their beliefs",
  'Because it jiggles!',
+ 'All your base are belong to us!',
+ 'Cheeses loves ya!    - The Messy Gourmet', 
+ 'When all you have is a hammer, suddenly everything looks like a nail...', 
 
  'KILLROY KILLROY'
  );
@@ -283,12 +287,13 @@ $conn->set_handler('chat_in',    \&on_chat_in);
 $conn->set_handler('chat_invite',    \&on_chat_invite);
 $conn->set_handler('chat_update_buddy',    \&on_chat_update_buddy);
 $conn->set_handler('update_buddy',    \&on_update_buddy);
+#$conn->set_handler('goto_url',    \&on_goto_url);
 
 print " done.\n" if ($DEBUG);
 print "starting...\n" if ($DEBUG);
 
 # Looks like you need to add buddies
-#$aim->add_buddy(0,'Buddies', ($ARGV[0]));
+$aim->add_buddy(0,'Buddies', ($ARGV[0]));
 
 #$aim->set('custmsg', "\nI think back and I remember.\nYou kissed with your eyes open.\nDid you not trust me?\nYou kissed without passion.\nDid you not love me?\nThis hurt me so.\nSo why did I fall in love with you?\n");
 

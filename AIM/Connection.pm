@@ -1,14 +1,16 @@
 package Net::AIM::Connection;
 
 #
-# $Revision: 1.15 $
+# $Revision: 1.18 $
 # $Author: aryeh $
-# $Date: 2001/01/25 23:14:58 $
+# $Date: 2001/10/26 03:48:12 $
 #
 
 =head1 NAME
 
 Net::AIM::Connection - Interface to an AIM connection
+
+=head1 SYNOPSIS
 
 =head1 DESCRIPTION
 
@@ -38,6 +40,8 @@ my %autoloaded = (
    'authport'     => undef,
    'screenname' => undef,
    'password' => undef,
+   'agent' => undef,
+   'auto_reconnect' => 0,
    'socket'   => undef,
    'select'   => undef,
    'verbose'  => undef,
@@ -47,12 +51,16 @@ my %autoloaded = (
 my %num_args = (
    nick => 1,
    eviled => 2,
+   disconnect => 1,
    chat_join => 2,
    chat_in => 4,
    chat_update_buddy => -1,
    chat_invite => 4,
    chat_left => 1,
    im_in => 3,
+   sign_on => 1,
+   goto_url => 2,
+   config => 1,
    update_buddy => 6,
    error => 2
 );
@@ -102,9 +110,9 @@ EOSub
 	 Screenname => 'perlaim',
 	 Password => 'ilyegk',
 	 TocServer => 'toc.oscar.aol.com',
-	 TocPort => 9898,
+	 TocPort => 80,
 	 AuthServer => 'login.oscar.aol.com',
-	 AuthPort => 1234
+	 AuthPort => 5159
      }
 
 Creates a new Connection object and tries to connect to the  AIM TOC server.
@@ -118,10 +126,11 @@ sub new {
     
     my $self = {                # obvious defaults go here, rest are user-set
 		_debug      => $_[0]->{_debug},
-		_port       => 6667,
+		_port       => 9898,
 		# Evals are for non-UNIX machines, just to make sure.
 		_screenname   => "perlaim",
 		_password   => '',
+		_agent   => 'Net::aim',
 		_ignore     => {},
 		_config     => {},
 		_handler    => {},
@@ -153,10 +162,12 @@ sub new {
    $aim_conn-E<gt>new( {
 	 Screenname => 'perlaim',  #required
 	 Password => 'ilyegk',  #required
-	 TocServer => 'toc.oscar.aol.com'
-	 TocPort => 9898
-	 AuthServer => 'login.oscar.aol.com'
-	 AuthPort => 1234
+	 TocServer => 'toc.oscar.aol.com',
+	 TocPort => 9898,
+	 AuthServer => 'login.oscar.aol.com',
+	 AutoReconnect => 1,
+	 Agent => 'Net::aim mychat', # DONT USE 'AIM'!!!
+	 AuthPort => 5159
      } );
 
 Sets up a connection to the AOL TOC server.
@@ -175,13 +186,17 @@ sub connect {
 	$self->authserver($arg{'AuthServer'}) if exists $arg{'AuthServer'};
 	$self->authport($arg{'AuthPort'}) if exists $arg{'AuthPort'};
 	$self->screenname($arg{'Screenname'}) if exists $arg{'Screenname'};
+	$self->agent($arg{'Agent'}) if exists $arg{'Agent'};
+	$self->auto_reconnect($arg{'AutoReconnect'}) if exists $arg{'AutoReconnect'};
     }
     
     # Lots of error-checking claptrap first...
     unless ($self->tocserver) { $self->tocserver( 'toc.oscar.aol.com' ); }
     unless ($self->tocport) { $self->tocport( 9898 ); }
     unless ($self->authserver) { $self->authserver( 'login.oscar.aol.com' ); }
-    unless ($self->authport) { $self->authport( 1234 ); }
+    unless ($self->authport) { $self->authport( 5159 ); }
+    unless ($self->agent) { $self->agent( $self->{_agent} ); }
+    unless ($self->auto_reconnect) { $self->auto_reconnect(0); }
     unless ($self->screenname) { croak "No password was specified on connect()"; }
     unless ($self->password) { croak "No password was specified on connect()"; }
     
@@ -206,7 +221,7 @@ sub connect {
     # Now, log in to the server...
     my $msg = "FLAPON\r\n\r\n";
     
-    if (!defined(syswrite($self->{_socket}, $msg, length($msg)))) {
+    if (!defined(send($self->{_socket}, $msg, 0))) {
 	carp "Couldn't send introduction to server: $!";
 	$self->error(1);
 	$! = "Couldn't send FLAPON introduction to " . $self->server;
@@ -249,7 +264,7 @@ sub send_im {
    $user = $self->normalize($user);
    $msg = $self->encode($msg);
 
-   return $self->send("toc_send_im $user $msg");
+   return $self->send_to_AOL("toc_send_im $user $msg");
 }
 
 =pod
@@ -264,7 +279,7 @@ sub set_idle {
    my $self = shift;
    my $idle = shift || 0;
 
-   return $self->send("toc_set_idle $idle");
+   return $self->send_to_AOL("toc_set_idle $idle");
 }
 
 =pod
@@ -278,7 +293,7 @@ sub add_buddy {
    my $self = shift;
    my @buddies = @_;
 	
-   return $self->send("toc_add_buddy " . join(' ', map { $self->normalize($_) } @buddies));
+   return $self->send_to_AOL("toc_add_buddy " . join(' ', map { $self->normalize($_) } @buddies));
 }
 
 =pod
@@ -292,7 +307,7 @@ sub add_permit {
    my $self = shift;
    my @buddies = @_;
 
-   return $self->send("toc_add_permit " . join(' ', map { $self->normalize($_) } @buddies));
+   return $self->send_to_AOL("toc_add_permit " . join(' ', map { $self->normalize($_) } @buddies));
 }
 
 =pod
@@ -306,7 +321,7 @@ sub add_deny {
    my $self = shift;
    my @buddies = @_;
 
-   return $self->send("toc_add_deny " . join(' ', map { $self->normalize($_) } @buddies));
+   return $self->send_to_AOL("toc_add_deny " . join(' ', map { $self->normalize($_) } @buddies));
 }
 
 =pod
@@ -320,7 +335,7 @@ sub remove_buddy {
    my $self = shift;
    my @buddies = @_;
 	
-   return $self->send("toc_remove_buddy " . join(' ', map { $self->normalize($_) } @buddies));
+   return $self->send_to_AOL("toc_remove_buddy " . join(' ', map { $self->normalize($_) } @buddies));
 }
 
 =pod
@@ -335,10 +350,10 @@ sub set_away {
    my $self = shift;
    my $msg = shift;
 
-   return $self->send("toc_set_away") unless($msg);
+   return $self->send_to_AOL("toc_set_away") unless($msg);
 
    $msg = $self->encode($msg);
-   return $self->send("toc_set_away $msg" );
+   return $self->send_to_AOL("toc_set_away $msg" );
 }
 
 =pod
@@ -354,7 +369,7 @@ sub get_info {
    my $user = shift;
 
    $user = $self->normalize($user);
-   return $self->send("toc_get_info $user" );
+   return $self->send_to_AOL("toc_get_info $user" );
 }
 
 =pod
@@ -369,7 +384,7 @@ sub set_info {
    my $info = shift;
 
    $info = $self->encode($info);
-   return $self->send("toc_set_info $info");
+   return $self->send_to_AOL("toc_set_info $info");
 }
 
 =pod
@@ -393,36 +408,40 @@ sub evil {
       $anon = "norm";
    }
 
-   return $self->send("toc_evil $user $anon" );
+   return $self->send_to_AOL("toc_evil $user $anon" );
 }
 
 =pod
 
-=item $aim_conn->send($message)
+=item $aim_conn->send_to_AOL($message)
 
 Send $message to the server.  This is used internally by other functions
 to send commands to the server.
 
-   $aim_conn->send('toc_add_buddy perlaim')
+   $aim_conn->send_to_AOL('toc_add_buddy perlaim')
 
 =cut
-sub send {
+sub send_to_AOL {
    my $self = shift;
    my $msg = shift;
 
-   my $data = pack "acnna*c", ('*', 2, $self->{"_outseq"}++, (length($msg) + 1), $msg, 0);
+#   my $data = pack "aCnn", ('*', 2, $self->{"_outseq"}++, (length($msg) + 1), $msg, 0);
+   $msg .= "\0";
+
+   my $data = pack "aCnna*", '*', 2, $self->{"_outseq"}, length($msg), $msg;
 
    ### DEBUG DEBUG DEBUG
    if ($self->{_debug}) {
       print STDERR ">>> [$self->{_outseq}] $msg\n";
    }
     
-   my $rv = syswrite($self->{_socket}, $data, length($data));
+   my $rv = send($self->{_socket}, $data, 0);
    unless ($rv) {
       carp "syswrite: $!";
       return;
    }
 
+   $self->{_outseq}++;
    return $rv;
 }
 
@@ -442,7 +461,7 @@ sub chat_invite {
    $room = $self->normalize($room);
    $msg = $self->encode($msg);
 	
-   return $self->send("toc_chat_invite $room $msg " . join(' ', map { $self->normalize($_) } @buddies));
+   return $self->send_to_AOL("toc_chat_invite $room $msg " . join(' ', map { $self->normalize($_) } @buddies));
 }
 
 =pod
@@ -456,7 +475,7 @@ sub chat_accept {
    my $self = shift;
    my $id = shift;
 
-   return $self->send("toc_chat_accept $id");
+   return $self->send_to_AOL("toc_chat_accept $id");
 }
 
 =pod
@@ -470,7 +489,7 @@ sub chat_leave {
    my $self = shift;
    my $id = shift;
 
-   return $self->send("toc_chat_leave $id" );
+   return $self->send_to_AOL("toc_chat_leave $id" );
 }
 
 =pod
@@ -489,12 +508,12 @@ sub chat_whisper {
    $user = $self->normalize($user);
    $msg = $self->encode($msg);
 
-   return $self->send("toc_chat_whisper $room_id $user $msg" );
+   return $self->send_to_AOL("toc_chat_whisper $room_id $user $msg" );
 }
 
 =pod
 
-=item $aim_conn->chat_send($room_id, $message)
+=item $aim_conn->chat_send_to_AOL($room_id, $message)
 
 Send $message in chat room $room_id
 
@@ -506,7 +525,7 @@ sub chat_send {
 
    $msg = $self->encode($msg);
 
-   return $self->send("toc_chat_send $room $msg" );
+   return $self->send_to_AOL("toc_chat_send $room $msg" );
 }
 
 =pod
@@ -521,7 +540,7 @@ sub chat_join {
    my $roomname = shift;
 
 #   $roomname = $self->normalize($roomname);
-   return $self->send("toc_chat_join 4 $roomname" );
+   return $self->send_to_AOL("toc_chat_join 4 $roomname" );
 }
 
 
@@ -569,6 +588,15 @@ sub disconnect {
     
    $self->{_connected} = 0;
    $self->socket( undef );
+
+}
+
+sub reconnect {
+   my $self = shift;
+   my $wait = shift || 10;
+
+   sleep($wait);
+   $self->connect();
 }
 
 # Tells AIM.pm if there was an error opening this connection. It's just
@@ -631,45 +659,42 @@ sub log_in {
    my $data = shift;
 
    my $screenname = $self->normalize($self->screenname);
-   print "Starting SignOn process...\n";
 
-   my $seq = (rand() * 0xffff);
-   my $msg = pack "acnnNnna*", ('*', 1, $seq, (8 + length($screenname)), 1, 1, length($screenname), $screenname);
-	
-   if (!defined(syswrite($self->{_socket}, $msg, length($msg)))) {
+   my $seq = int(rand(100000));
+   my $signon_data = pack "Nnna".length($screenname), 1, 1, length($screenname), $screenname;
+   my $msg = pack "aCnn", '*', 1, $seq, length($signon_data);
+   $msg .= $signon_data;
+
+   if (!defined( send $self->{_socket}, $msg, 0 )) {
       carp "syswrite: $!";
       return 0;
    }
 
-   $self->{"_outseq"} = ++$seq & 0xffff;
+   $self->{"_outseq"} = ++$seq;
 
-   my $version = 'Net::AIM $Revision $';
-
-   $self->send('toc_signon ' . $self->authserver . ' ' .
-	 $self->authport . ' ' . $screenname . ' ' .
+   $self->send_to_AOL('toc_signon "' . $self->authserver . '" "' .
+	 $self->authport . '" "' . $screenname . '" "' .
 	 $self->encodePass($self->password) . 
-	 ' english ' . $self->encode($version));
+	 '" "english" ' . $self->encode($self->agent));
 
-   #wait here for the signon message
-#   my @a = $self->sflap_recv();
-#   print "While waiting for SIGNON got $a[1]\n";
-
-#   $self->send_config();
-#   $self->send("toc_init_done");
 
    # For PAUSE
-   $self->set_handler('pause', sub { 1; });
+   $self->set_handler('pause', sub { sleep(1); });
+   $self->set_handler('pause', sub { 
+          my $self = shift;
+	  $self->reconnect();
+       }) if ($self->auto_reconnect);
    $self->set_handler('sign_on', sub {
       my $self = shift;
 
       # We should have some buddies here...
       $self->send_buddies();
       $self->set_info('I am running Net::AIM perl module written by Aryeh Goldsmith');
-      $self->{_conn}->send('toc_init_done');
-      print "DONE SIGNON\n" if ($self->{_debug});
+      $self->{_conn}->send_to_AOL('toc_init_done');
+      print "Set SIGNON HANDLER\n" if ($self->{_debug});
    });
 
-   print STDOUT "Done SignON...\n";
+   print "DONE SIGNON\n" if ($self->{_debug});
 }
 
 =pod
@@ -711,7 +736,7 @@ sub encodePass {
 
 =pod
 
-=item $aim_conn->send_confg($cfg_str)
+=item $aim_conn->send_config($cfg_str)
 
 Sends $cfg_str to the server to be used as configuration values for the account.
 
@@ -719,9 +744,12 @@ Sends $cfg_str to the server to be used as configuration values for the account.
 sub send_config {
    my $self = shift;
    my $configstr = shift;
-   $self->send("toc_set_config {$configstr}\n");
 
+   $self->send_to_AOL("toc_set_config {$configstr}\n");
    return;
+
+   $configstr = '';
+
    if ( defined $self->{_config} &&
       exists $self->{_config}->{mode} &&
       $self->{_config}->{mode} =~ /^\d$/ ) {
@@ -739,34 +767,38 @@ sub send_config {
       }
    }
 
-   $self->send("toc_set_config {$configstr}\n");
+   $self->send_to_AOL("toc_set_config {$configstr}\n");
 #	print "toc_set_config $configstr\n-----\n" ;
 
 }
 
 sub sflap_recv {
    my ($self) = shift;
- 
    my ($marker, $type, $seq, $len, $header, $data);
 
-   #print STDERR "In parse routine..\n";
+   print "Entering sflap_recv\n" if ($self->{_debug});
 
    if (defined recv($self->socket, $header, 6, 0) && length($header) > 0)  {
-      ($marker, $type, $seq, $len) = unpack "acnn", $header;
+      ($marker, $type, $seq, $len) = unpack "aCnn", $header;
    } else {	
-      $self->disconnect('error', 'Connection reset by peer');
+#      print time . "WE WERE DISCONNETED!!!!\n";
+#      print STDERR time . "WE WERE DISCONNETED!!!!\n";
+#      $self->disconnect('error', 'Connection reset by peer');
+      $self->{_connected} = 0;
+      $self->socket( undef );
       return (0, 'DISCONNECT:');
    }
 #   my $inseq = ($self->{"_inseq"} + 1) & 0x0000ffff;
-   $seq &= 0x0000ffff;
+#   $seq &= 0x0000ffff;
    $self->{"_inseq"} = $seq;
 
-   unless (recv($self->socket, $data, $len, 0)) {
+   unless (defined (recv($self->socket, $data, $len, 0))) {
       return undef;
    }
 
+   $data = unpack("a*", $data);
    if ($self->{_debug}) {
-      print STDERR "<<< [$type] $data\n";
+      print STDERR "<<< [$seq] $type $data\n";
    }
    return  ($type, $data);
 
@@ -783,6 +815,8 @@ sub read_and_parse {
     my ($self) = shift;
     my ($from, $type, $seq, @stuff, $to, $cmd, $ev, $marker,
 	$len, $header, $line, $data, $arg);
+
+   print "Entering read_and_parse\n" if ($self->{_debug});
 
    ($type, $data) = $self->sflap_recv();
 
