@@ -1,9 +1,8 @@
 AIM.pm
-AIM/Connection.pm
-AIM/Event.pm
+Changes
 MANIFEST
 Makefile.PL
-PROTOCOL
 README
-TODO
-aimtest
+INSTALL
+TOC.7
+example.pl
